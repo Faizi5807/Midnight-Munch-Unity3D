@@ -3,17 +3,10 @@ using UnityEngine;
 [RequireComponent(typeof(SpriteRenderer), typeof(Rigidbody2D), typeof(Collider2D))]
 public class IngredientBehavior : MonoBehaviour
 {
-    // These values will be set by the spawner:
     private int scoreValue;
     private bool isBadIngredient;
     private GameObject catchEffect;
 
-    /// <summary>
-    /// Call this immediately after Instantiate(...) to set up scoring and VFX.
-    /// </summary>
-    /// <param name="value">Points to add (or subtract if isBad)</param>
-    /// <param name="isBad">True if catching this should deduct a life</param>
-    /// <param name="effect">Optional particle prefab to spawn on catch</param>
     public void Initialize(int value, bool isBad, GameObject effect = null)
     {
         scoreValue = value;
@@ -21,28 +14,35 @@ public class IngredientBehavior : MonoBehaviour
         catchEffect = effect;
     }
 
-    // Trigger-based catching
     private void OnTriggerEnter2D(Collider2D other)
     {
-        // Only respond to collisions with the player
-        if (!other.CompareTag("Player"))
-            return;
+        Debug.Log($"Ingredient collided with: {other.name}");
 
-        // 1) Play catch VFX if assigned
+        if (!other.CompareTag("Player"))
+        {
+            Debug.Log("Collision ignored: Not a player");
+            return;
+        }
+
         if (catchEffect != null)
+        {
             Instantiate(catchEffect, transform.position, Quaternion.identity);
-       
-        // 2) Update score or lives via GameManager
+            Debug.Log("Catch effect instantiated");
+        }
+
         if (isBadIngredient)
         {
+            Debug.Log("Bad ingredient caught! Deducting a life.");
             GameManager.Instance.AdjustLives(-1);
+            GameManager.Instance.AddScore(-20);
         }
         else
         {
+            Debug.Log("Good ingredient caught! Adding score.");
             GameManager.Instance.AddScore(scoreValue);
         }
-        Destroy(gameObject);
-        // 3) Destroy this ingredient
 
+        Debug.Log("Destroying ingredient...");
+        Destroy(gameObject);
     }
 }

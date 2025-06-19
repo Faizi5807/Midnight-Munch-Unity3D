@@ -1,17 +1,14 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using TMPro;  // or UnityEngine.UI if you use UI.Text
+using TMPro;
 
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
     [Header("Level Settings")]
-    [Tooltip("Number of levels in the game")]
     public int maxLevels = 8;
-    [Tooltip("Score required to advance per level")]
     public int scorePerLevel = 20;
-    [Tooltip("Multiplier to decrease spawn interval each level")]
     public float spawnIntervalStep = 0.1f;
 
     [Header("Runtime State")]
@@ -25,13 +22,18 @@ public class GameManager : MonoBehaviour
     public TextMeshProUGUI levelText;
     public GameObject nextLevelPanel;
     public GameObject gameOverPanel;
+    public GameObject gameEndPanel;
 
     [Header("Spawner Reference")]
     public IngredientSpawner spawner;
 
     private void Awake()
     {
-        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
         Instance = this;
         DontDestroyOnLoad(gameObject);
     }
@@ -45,15 +47,25 @@ public class GameManager : MonoBehaviour
     {
         currentLevel = 1;
         score = 0;
-        lives = 3;                // or pull from your existing startingLives
+        lives = 3;
         UpdateUI();
-        gameOverPanel.SetActive(false);
-        nextLevelPanel.SetActive(false);
 
-        // configure spawner
-        spawner.spawnInterval = spawner.baseSpawnInterval;
-        spawner.CancelInvoke();
-        spawner.InvokeRepeating(nameof(spawner.Spawn), 0.5f, spawner.spawnInterval);
+        if (gameOverPanel != null)
+            gameOverPanel.SetActive(false);
+        if (nextLevelPanel != null)
+            nextLevelPanel.SetActive(false);
+
+        if (spawner != null)
+        {
+            spawner.spawnInterval = spawner.baseSpawnInterval;
+            spawner.StopSpawning(); 
+            spawner.StartSpawning();
+            spawner.InvokeRepeating(nameof(spawner.Spawn), 0.5f, spawner.spawnInterval);
+        }
+        else
+        {
+            Debug.LogError("Spawner is not assigned!");
+        }
     }
 
     void UpdateUI()
@@ -65,41 +77,48 @@ public class GameManager : MonoBehaviour
 
     public void AddScore(int pts)
     {
-        Debug.Log($"current score {score}");
-        Debug.Log($"current lives {lives}");
-       //if (nextLevelPanel.activeSelf || gameOverPanel.activeSelf) return;
+        if (nextLevelPanel.activeSelf || gameOverPanel.activeSelf) return;
 
         score += pts;
-        Debug.Log($"current score {score}");
-        Debug.Log($"current lives {lives}");
-       UpdateUI();
+        UpdateUI();
 
-        //Check for level up
+        Debug.Log($"Score updated: {score}");
+
         if (score >= scorePerLevel && lives > 0)
-                TriggerNextLevel();
+        {
+            Debug.Log("Triggering Next Level");
+            nextLevelPanel.SetActive(true);
+            //TriggerNextLevel();
+        }
     }
 
     public void AdjustLives(int delta)
-
     {
-        Debug.Log($"current score {score}");
-        Debug.Log($"current lives {lives}");
-        //if (nextLevelPanel.activeSelf || gameOverPanel.activeSelf) return;
+        if (nextLevelPanel.activeSelf || gameOverPanel.activeSelf) return;
 
         lives += delta;
-        Debug.Log($"current score {score}");
-        Debug.Log($"current lives {lives}");
         UpdateUI();
 
+        Debug.Log($"Lives updated: {lives}");
+
         if (lives <= 0)
-           TriggerGameOver();
+        {
+            Debug.Log("Triggering Game Over!");
+            gameOverPanel.SetActive(true);
+            //TriggerGameOver();
+        }
     }
 
     void TriggerNextLevel()
     {
-        // Stop spawning
-        spawner.CancelInvoke();
-        // Show the panel (expects two buttons wired to NextLevel() and ExitToGameOver())
+        if (nextLevelPanel == null)
+        {
+            Debug.LogError("Next Level Panel is not assigned!");
+            return;
+        }
+
+        Debug.Log("Triggering Next Level...");
+        //spawner.StopSpawning(); ;
         nextLevelPanel.SetActive(true);
     }
 
@@ -107,37 +126,43 @@ public class GameManager : MonoBehaviour
     {
         if (currentLevel >= maxLevels)
         {
-            // You could treat this as win state
             TriggerGameOver();
             return;
         }
 
         currentLevel++;
-        score = 0;  // reset score for new level
+        score = 0;
         UpdateUI();
 
-        // Speed up spawning
-        spawner.spawnInterval = Mathf.Max(0.2f, spawner.spawnInterval - spawnIntervalStep);
-
-        // Hide panel and resume spawning
+        Debug.Log($"Advancing to Level: {currentLevel}");
+        //float newSpawnInterval = Mathf.Max(0.2f, spawner.GetCurrentSpawnInterval() - spawnIntervalStep);
+        //spawner.AdjustSpawnInterval(Mathf.Max(0.2f, spawner.spawnInterval - spawnIntervalStep));
         nextLevelPanel.SetActive(false);
+        spawner.StartSpawning();
         spawner.InvokeRepeating(nameof(spawner.Spawn), 0.5f, spawner.spawnInterval);
     }
 
     public void ExitToGameOver()
     {
         nextLevelPanel.SetActive(false);
-        TriggerGameOver();
+        gameOverPanel.SetActive(true);
+        //TriggerGameOver();
     }
 
     void TriggerGameOver()
     {
-        // Stop spawning once and for all
-        spawner.CancelInvoke();
+        if (gameOverPanel == null)
+        {
+            Debug.LogError("Game Over Panel is not assigned!");
+            return;
+        }
+
+        Debug.Log("Game Over triggered");
+        spawner.StopSpawning(); ;
         gameOverPanel.SetActive(true);
     }
 
-    // Optional UI button hooks
     public void RestartGame() => InitGame();
+
     public void QuitToMenu() => SceneManager.LoadScene("MainMenu");
 }
